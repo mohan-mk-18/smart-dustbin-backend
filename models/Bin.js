@@ -3,7 +3,8 @@ const mongoose = require("mongoose");
 const binSchema = new mongoose.Schema({
   binId: {
     type: String,
-    required: true
+    required: true,
+    unique: true
   },
   distance: {
     type: Number,
@@ -24,6 +25,10 @@ const binSchema = new mongoose.Schema({
   rfidAccess: {
     type: String,
     default: "None"
+  },
+  locked: {
+    type: Boolean,
+    default: false
   },
   timestamp: {
     type: Date,
