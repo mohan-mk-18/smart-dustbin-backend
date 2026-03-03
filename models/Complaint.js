@@ -8,7 +8,10 @@ const complaintSchema = new mongoose.Schema(
     image: String,
     status: {
       type: String,
-      default: "Pending",
+      enum: ["pending", "cleared"], // only lowercase allowed
+      default: "pending",
+      lowercase: true, // auto converts to lowercase before saving
+      trim: true,
     },
   },
   { timestamps: true }
