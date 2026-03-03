@@ -2,50 +2,54 @@ const express = require("express");
 const router = express.Router();
 const Bin = require("../models/Bin");
 
-/* ===========================
-   GET — All Bins (for Admin Dashboard)
-=========================== */
+/* =========================================
+   GET — All Bins
+========================================= */
 router.get("/", async (req, res) => {
   try {
-    const bins = await Bin.find().sort({ timestamp: -1 });
+    const bins = await Bin.find().sort({ binId: 1 });
     res.json(bins);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-/* ===========================
-   POST — Receive data from ESP32
-=========================== */
+/* =========================================
+   POST — Create or Update Bin
+========================================= */
 router.post("/", async (req, res) => {
   try {
-    const newData = new Bin(req.body);
-    await newData.save();
-    res.status(201).json({ message: "Data saved successfully" });
+    const { binId } = req.body;
+
+    if (!binId) {
+      return res.status(400).json({ error: "binId is required" });
+    }
+
+    // Update if exists, create if not
+    const updatedBin = await Bin.findOneAndUpdate(
+      { binId: binId },
+      req.body,
+      { new: true, upsert: true }
+    );
+
+    res.status(200).json({
+      message: "Bin data saved successfully",
+      data: updatedBin
+    });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-/* ===========================
-   GET — Latest Bin Data
-=========================== */
-router.get("/latest", async (req, res) => {
+/* =========================================
+   GET — Latest Single Bin by ID
+========================================= */
+router.get("/:binId", async (req, res) => {
   try {
-    const latestData = await Bin.findOne().sort({ timestamp: -1 });
-    res.json(latestData);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-/* ===========================
-   GET — Full History
-=========================== */
-router.get("/history", async (req, res) => {
-  try {
-    const history = await Bin.find().sort({ timestamp: -1 });
-    res.json(history);
+    const bin = await Bin.findOne({ binId: req.params.binId });
+    if (!bin) return res.status(404).json({ error: "Bin not found" });
+    res.json(bin);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
