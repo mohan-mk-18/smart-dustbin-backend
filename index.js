@@ -4,35 +4,60 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 
+const complaintRoutes = require("./routes/complaintRoutes");
+const binRoutes = require("./routes/binRoutes");
+
 const app = express();
+
+/* ===========================
+   Middlewares
+=========================== */
 
 app.use(cors());
 app.use(express.json());
 
-// Connect to MongoDB
+/* ===========================
+   Root Route (Health Check)
+=========================== */
+
+app.get("/", (req, res) => {
+  res.status(200).json({
+    message: "Smart Dustbin Backend Running 🚀",
+    status: "OK"
+  });
+});
+
+/* ===========================
+   API Routes
+=========================== */
+
+app.use("/complaints", complaintRoutes);
+app.use("/bins", binRoutes);
+
+/* ===========================
+   404 Handler (Important)
+=========================== */
+
+app.use((req, res) => {
+  res.status(404).json({
+    error: "Route not found"
+  });
+});
+
+/* ===========================
+   MongoDB Connection
+=========================== */
+
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log("MongoDB Connected");
+
+    // Start server ONLY after DB connects
+    app.listen(process.env.PORT, () => {
+      console.log(`Server running on port ${process.env.PORT}`);
+    });
+
   })
   .catch((err) => {
-    console.error("MongoDB Initial Connection Error:", err);
+    console.error("MongoDB Connection Error:", err);
   });
-
-// Listen for connection events
-mongoose.connection.on("error", (err) => {
-  console.error("MongoDB Runtime Error:", err);
-});
-
-mongoose.connection.on("disconnected", () => {
-  console.log("MongoDB Disconnected...");
-});
-
-// Routes
-const binRoutes = require("./routes/binRoutes");
-app.use("/api/bin", binRoutes);
-
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
