@@ -55,4 +55,28 @@ router.get("/:binId", async (req, res) => {
   }
 });
 
+/* =========================================
+   PATCH — Toggle Lock
+========================================= */
+router.patch("/:binId/lock", async (req, res) => {
+  try {
+    const bin = await Bin.findOne({ binId: req.params.binId });
+
+    if (!bin) {
+      return res.status(404).json({ error: "Bin not found" });
+    }
+
+    bin.locked = !bin.locked;
+    await bin.save();
+
+    res.json({
+      message: "Lock state updated",
+      data: bin
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
