@@ -69,4 +69,35 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+/* =========================================
+   RFID VERIFICATION API
+========================================= */
+
+router.post("/verify-rfid", async (req, res) => {
+
+  try {
+
+    const { uid } = req.body;
+
+    const worker = await Worker.findOne({ uid });
+
+    if (worker) {
+      return res.json({
+        access: true,
+        name: worker.name
+      });
+    }
+
+    res.json({
+      access: false
+    });
+
+  } catch (error) {
+
+    res.status(500).json({ error: error.message });
+
+  }
+
+});
+
 module.exports = router;
