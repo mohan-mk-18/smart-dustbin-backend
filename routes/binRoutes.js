@@ -15,20 +15,31 @@ router.get("/", async (req, res) => {
 });
 
 /* =========================================
-   POST — Create or Update Bin
+   POST — Create or Update Bin (Sensor Data)
+   IMPORTANT: Does NOT overwrite lock state
 ========================================= */
 router.post("/", async (req, res) => {
   try {
-    const { binId } = req.body;
+    const { binId, distance, fillStatus, gasValue, gasStatus, rfidAccess } = req.body;
 
     if (!binId) {
       return res.status(400).json({ error: "binId is required" });
     }
 
     const updatedBin = await Bin.findOneAndUpdate(
-      { binId: binId },
-      req.body,
-      { new: true, upsert: true }
+      { binId },
+      {
+        distance,
+        fillStatus,
+        gasValue,
+        gasStatus,
+        rfidAccess,
+        timestamp: new Date()
+      },
+      {
+        new: true,
+        upsert: true
+      }
     );
 
     res.status(200).json({
@@ -42,7 +53,7 @@ router.post("/", async (req, res) => {
 });
 
 /* =========================================
-   GET — Latest Single Bin by ID
+   GET — Single Bin by ID
 ========================================= */
 router.get("/:binId", async (req, res) => {
   try {
@@ -60,7 +71,7 @@ router.get("/:binId", async (req, res) => {
 });
 
 /* =========================================
-   PATCH — Toggle Lock
+   PATCH — Toggle Lock (Admin Control)
 ========================================= */
 router.patch("/:binId/lock", async (req, res) => {
   try {
