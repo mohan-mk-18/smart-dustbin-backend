@@ -15,31 +15,20 @@ router.get("/", async (req, res) => {
 });
 
 /* =========================================
-   POST — Create or Update Bin (Sensor Data)
-   IMPORTANT: Does NOT overwrite lock state
+   POST — Create or Update Bin
 ========================================= */
 router.post("/", async (req, res) => {
   try {
-    const { binId, distance, fillStatus, gasValue, gasStatus, rfidAccess } = req.body;
+    const { binId } = req.body;
 
     if (!binId) {
       return res.status(400).json({ error: "binId is required" });
     }
 
     const updatedBin = await Bin.findOneAndUpdate(
-      { binId },
-      {
-        distance,
-        fillStatus,
-        gasValue,
-        gasStatus,
-        rfidAccess,
-        timestamp: new Date()
-      },
-      {
-        new: true,
-        upsert: true
-      }
+      { binId: binId },
+      req.body,
+      { new: true, upsert: true }
     );
 
     res.status(200).json({
@@ -71,10 +60,11 @@ router.get("/:binId", async (req, res) => {
 });
 
 /* =========================================
-   PATCH — Toggle Lock (Admin Control)
+   PATCH — Toggle Lock
 ========================================= */
 router.patch("/:binId/lock", async (req, res) => {
   try {
+
     const bin = await Bin.findOne({ binId: req.params.binId });
 
     if (!bin) {
@@ -92,6 +82,40 @@ router.patch("/:binId/lock", async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+/* =========================================
+   DEMO MODE - FORCE BIN STATUS
+========================================= */
+
+router.patch("/:binId/demo", async (req, res) => {
+
+  try {
+
+    const { fillStatus, gasStatus } = req.body;
+
+    const bin = await Bin.findOne({ binId: req.params.binId });
+
+    if (!bin) {
+      return res.status(404).json({ error: "Bin not found" });
+    }
+
+    if (fillStatus) bin.fillStatus = fillStatus;
+    if (gasStatus) bin.gasStatus = gasStatus;
+
+    await bin.save();
+
+    res.json({
+      message: "Demo update successful",
+      data: bin
+    });
+
+  } catch (error) {
+
+    res.status(500).json({ error: error.message });
+
+  }
+
 });
 
 module.exports = router;
