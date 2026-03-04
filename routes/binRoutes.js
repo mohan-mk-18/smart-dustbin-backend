@@ -25,7 +25,6 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "binId is required" });
     }
 
-    // Update if exists, create if not
     const updatedBin = await Bin.findOneAndUpdate(
       { binId: binId },
       req.body,
@@ -48,8 +47,13 @@ router.post("/", async (req, res) => {
 router.get("/:binId", async (req, res) => {
   try {
     const bin = await Bin.findOne({ binId: req.params.binId });
-    if (!bin) return res.status(404).json({ error: "Bin not found" });
+
+    if (!bin) {
+      return res.status(404).json({ error: "Bin not found" });
+    }
+
     res.json(bin);
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
