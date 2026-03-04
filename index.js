@@ -6,6 +6,7 @@ const cors = require("cors");
 
 const complaintRoutes = require("./routes/complaintRoutes");
 const binRoutes = require("./routes/binRoutes");
+const workerRoutes = require("./routes/workerRoutes"); // ✅ NEW
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.get("/", (req, res) => {
 
 app.use("/complaints", complaintRoutes);
 app.use("/bins", binRoutes);
+app.use("/workers", workerRoutes); // ✅ NEW
 
 /* ===========================
    404 Handler (Important)
@@ -52,7 +54,6 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log("MongoDB Connected");
 
-    // Start server ONLY after DB connects
     app.listen(process.env.PORT, () => {
       console.log(`Server running on port ${process.env.PORT}`);
     });
