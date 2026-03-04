@@ -6,7 +6,8 @@ const cors = require("cors");
 
 const complaintRoutes = require("./routes/complaintRoutes");
 const binRoutes = require("./routes/binRoutes");
-const workerRoutes = require("./routes/workerRoutes"); // ✅ NEW
+const workerRoutes = require("./routes/workerRoutes");
+const rfidRoutes = require("./routes/rfidRoutes"); // ✅ NEW
 
 const app = express();
 
@@ -34,7 +35,8 @@ app.get("/", (req, res) => {
 
 app.use("/complaints", complaintRoutes);
 app.use("/bins", binRoutes);
-app.use("/workers", workerRoutes); // ✅ NEW
+app.use("/workers", workerRoutes);
+app.use("/rfid-access", rfidRoutes); // ✅ NEW
 
 /* ===========================
    404 Handler (Important)
