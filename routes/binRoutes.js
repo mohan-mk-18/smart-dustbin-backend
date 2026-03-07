@@ -1,6 +1,17 @@
 const express = require("express");
 const router = express.Router();
 const Bin = require("../models/Bin");
+function verifyAPI(req, res, next) {
+
+  const apiKey = req.headers["x-api-key"];
+
+  if (apiKey !== process.env.API_KEY) {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+
+  next();
+
+}
 
 /* =========================================
    GET — All Bins
@@ -17,7 +28,7 @@ router.get("/", async (req, res) => {
 /* =========================================
    POST — Create or Update Bin
 ========================================= */
-router.post("/", async (req, res) => {
+router.post("/", verifyAPI, async (req, res) => {
   try {
     const { binId } = req.body;
 
@@ -62,7 +73,7 @@ router.get("/:binId", async (req, res) => {
 /* =========================================
    PATCH — Toggle Lock
 ========================================= */
-router.patch("/:binId/lock", async (req, res) => {
+router.patch("/:binId/lock", verifyAPI, async (req, res) => {
   try {
 
     const bin = await Bin.findOne({ binId: req.params.binId });
@@ -88,7 +99,7 @@ router.patch("/:binId/lock", async (req, res) => {
    DEMO MODE - FORCE BIN STATUS
 ========================================= */
 
-router.patch("/:binId/demo", async (req, res) => {
+router.patch("/:binId/demo", verifyAPI, async (req, res) => {
 
   try {
 
