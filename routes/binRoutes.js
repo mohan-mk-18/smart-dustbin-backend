@@ -161,7 +161,7 @@ router.patch("/:binId/lock", verifyAPI, async (req, res) => {
 /* =========================================
    DEMO MODE - FORCE BIN STATUS
 ========================================= */
-router.patch("/:binId/demo", verifyAPI, async (req, res) => {
+router.patch("/:binId/demo", async (req, res) => {
 
   try {
 
