@@ -4,19 +4,28 @@ const Complaint = require("../models/Complaint");
 
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 
 /* ==============================
-   MULTER CONFIG
+   MULTER CONFIG (FIXED)
 ============================== */
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/");
+    const dir = "uploads/";
+
+    // create folder if not exists (important for Render)
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    cb(null, dir);
   },
   filename: (req, file, cb) => {
     cb(null, Date.now() + path.extname(file.originalname));
   },
 });
 
+// ✅ IMPORTANT LINE
 const upload = multer({ storage });
 
 /* ==============================
@@ -32,7 +41,7 @@ router.get("/", async (req, res) => {
 });
 
 /* ==============================
-   POST NEW COMPLAINT (FIXED)
+   POST NEW COMPLAINT (FINAL FIX)
 ============================== */
 router.post("/", upload.single("image"), async (req, res) => {
   try {
@@ -50,6 +59,7 @@ router.post("/", upload.single("image"), async (req, res) => {
     });
 
     const saved = await newComplaint.save();
+
     res.status(201).json(saved);
 
   } catch (err) {
