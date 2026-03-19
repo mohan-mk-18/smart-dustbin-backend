@@ -2,7 +2,26 @@ const express = require("express");
 const router = express.Router();
 const Complaint = require("../models/Complaint");
 
-// GET all complaints
+const multer = require("multer");
+const path = require("path");
+
+/* ==============================
+   MULTER CONFIG
+============================== */
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({ storage });
+
+/* ==============================
+   GET ALL COMPLAINTS
+============================== */
 router.get("/", async (req, res) => {
   try {
     const complaints = await Complaint.find().sort({ createdAt: -1 });
@@ -12,18 +31,36 @@ router.get("/", async (req, res) => {
   }
 });
 
-// POST new complaint
-router.post("/", async (req, res) => {
+/* ==============================
+   POST NEW COMPLAINT (FIXED)
+============================== */
+router.post("/", upload.single("image"), async (req, res) => {
   try {
-    const newComplaint = new Complaint(req.body);
+    console.log("BODY:", req.body);
+    console.log("FILE:", req.file);
+
+    const { name, phone, location, message } = req.body;
+
+    const newComplaint = new Complaint({
+      name,
+      phone,
+      location,
+      message,
+      image: req.file ? req.file.filename : "",
+    });
+
     const saved = await newComplaint.save();
     res.status(201).json(saved);
+
   } catch (err) {
+    console.error("ERROR:", err);
     res.status(400).json({ message: err.message });
   }
 });
 
-// UPDATE complaint status (STANDARDIZED)
+/* ==============================
+   UPDATE COMPLAINT STATUS
+============================== */
 router.patch("/:id", async (req, res) => {
   try {
     let { status } = req.body;
@@ -49,6 +86,7 @@ router.patch("/:id", async (req, res) => {
     }
 
     res.json(updated);
+
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
