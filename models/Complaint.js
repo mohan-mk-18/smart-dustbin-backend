@@ -3,14 +3,15 @@ const mongoose = require("mongoose");
 const complaintSchema = new mongoose.Schema(
   {
     name: String,
+    phone: String, // ✅ ADD THIS LINE ONLY
     location: String,
     message: String,
     image: String,
     status: {
       type: String,
-      enum: ["pending", "cleared"], // only lowercase allowed
+      enum: ["pending", "cleared"],
       default: "pending",
-      lowercase: true, // auto converts to lowercase before saving
+      lowercase: true,
       trim: true,
     },
   },
