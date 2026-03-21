@@ -48,11 +48,11 @@ router.post("/", upload.single("image"), async (req, res) => {
     console.log("BODY:", req.body);
     console.log("FILE:", req.file);
 
-    const { name, phone, location, message } = req.body;
+    const { name, email, location, message } = req.body;
 
     const newComplaint = new Complaint({
       name,
-      phone,
+      email,
       location,
       message,
       image: req.file ? req.file.filename : "",
