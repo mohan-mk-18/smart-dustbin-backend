@@ -3,29 +3,27 @@ const router = express.Router();
 const Complaint = require("../models/Complaint");
 
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
 
 /* ==============================
-   MULTER CONFIG (FIXED)
+   CLOUDINARY CONFIG
 ============================== */
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = "uploads/";
+const cloudinary = require("cloudinary").v2;
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
-    // create folder if not exists (important for Render)
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+cloudinary.config({
+  cloud_name: process.env.CLOUD_NAME,
+  api_key: process.env.CLOUD_API_KEY,
+  api_secret: process.env.CLOUD_API_SECRET,
+});
 
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "smart-dustbin",
+    allowed_formats: ["jpg", "png", "jpeg"],
   },
 });
 
-// ✅ IMPORTANT LINE
 const upload = multer({ storage });
 
 /* ==============================
@@ -41,7 +39,7 @@ router.get("/", async (req, res) => {
 });
 
 /* ==============================
-   POST NEW COMPLAINT (FINAL FIX)
+   POST NEW COMPLAINT (CLOUDINARY)
 ============================== */
 router.post("/", upload.single("image"), async (req, res) => {
   try {
@@ -55,7 +53,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       email,
       location,
       message,
-      image: req.file ? req.file.filename : "",
+      image: req.file ? req.file.path : "", // ✅ Cloudinary URL
     });
 
     const saved = await newComplaint.save();
