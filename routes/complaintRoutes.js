@@ -16,11 +16,18 @@ cloudinary.config({
   api_secret: process.env.CLOUD_API_SECRET,
 });
 
+/* ==============================
+   STORAGE CONFIG (FIXED)
+============================== */
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: "smart-dustbin",
-    allowed_formats: ["jpg", "png", "jpeg"],
+  params: async (req, file) => {
+    return {
+      folder: "smart-dustbin",
+      resource_type: "image", // ✅ IMPORTANT FIX
+      format: "png", // optional
+      public_id: Date.now().toString(),
+    };
   },
 });
 
@@ -39,7 +46,7 @@ router.get("/", async (req, res) => {
 });
 
 /* ==============================
-   POST NEW COMPLAINT (CLOUDINARY)
+   POST NEW COMPLAINT (FINAL FIX)
 ============================== */
 router.post("/", upload.single("image"), async (req, res) => {
   try {
@@ -48,12 +55,15 @@ router.post("/", upload.single("image"), async (req, res) => {
 
     const { name, email, location, message } = req.body;
 
+    // ✅ SAFE IMAGE HANDLING
+    const imageUrl = req.file ? req.file.path : "";
+
     const newComplaint = new Complaint({
       name,
       email,
       location,
       message,
-      image: req.file ? req.file.path : "", // ✅ Cloudinary URL
+      image: imageUrl,
     });
 
     const saved = await newComplaint.save();
@@ -61,8 +71,11 @@ router.post("/", upload.single("image"), async (req, res) => {
     res.status(201).json(saved);
 
   } catch (err) {
-    console.error("ERROR:", err);
-    res.status(400).json({ message: err.message });
+    console.error("FULL ERROR:", err); // ✅ IMPORTANT
+    res.status(500).json({
+      message: "Server error",
+      error: err.message,
+    });
   }
 });
 
