@@ -3,6 +3,26 @@ const router = express.Router();
 const Bin = require("../models/Bin");
 
 /* =========================================
+   ONLINE THRESHOLD (SECONDS)
+========================================= */
+const ONLINE_THRESHOLD = 10;
+
+/* =========================================
+   HELPER FUNCTION
+========================================= */
+function addOnlineStatus(bin) {
+  const now = new Date();
+  const last = new Date(bin.updatedAt);
+
+  const diff = (now - last) / 1000; // seconds
+
+  return {
+    ...bin._doc,
+    isOnline: diff < ONLINE_THRESHOLD
+  };
+}
+
+/* =========================================
    API KEY SECURITY
 ========================================= */
 function verifyAPI(req, res, next) {
@@ -24,7 +44,9 @@ router.get("/", async (req, res) => {
 
     const bins = await Bin.find().sort({ binId: 1 });
 
-    res.json(bins);
+    const binsWithStatus = bins.map(bin => addOnlineStatus(bin));
+
+    res.json(binsWithStatus);
 
   } catch (error) {
 
@@ -45,7 +67,7 @@ router.get("/:binId", async (req, res) => {
       return res.status(404).json({ error: "Bin not found" });
     }
 
-    res.json(bin);
+    res.json(addOnlineStatus(bin));
 
   } catch (error) {
 
@@ -176,8 +198,6 @@ router.patch("/:binId/demo", async (req, res) => {
     if (fillStatus) {
 
       bin.fillStatus = fillStatus;
-
-      /* AUTO LOCK IN DEMO ALSO */
 
       if (fillStatus === "FULL") {
         bin.locked = true;
