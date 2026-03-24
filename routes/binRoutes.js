@@ -14,7 +14,7 @@ function addOnlineStatus(bin) {
   const now = new Date();
   const last = new Date(bin.updatedAt);
 
-  const diff = (now - last) / 1000; // seconds
+  const diff = (now - last) / 1000;
 
   return {
     ...bin._doc,
@@ -26,7 +26,6 @@ function addOnlineStatus(bin) {
    API KEY SECURITY
 ========================================= */
 function verifyAPI(req, res, next) {
-
   const apiKey = req.headers["x-api-key"];
 
   if (apiKey !== process.env.API_KEY) {
@@ -41,7 +40,6 @@ function verifyAPI(req, res, next) {
 ========================================= */
 router.get("/", async (req, res) => {
   try {
-
     const bins = await Bin.find().sort({ binId: 1 });
 
     const binsWithStatus = bins.map(bin => addOnlineStatus(bin));
@@ -49,9 +47,7 @@ router.get("/", async (req, res) => {
     res.json(binsWithStatus);
 
   } catch (error) {
-
     res.status(500).json({ error: error.message });
-
   }
 });
 
@@ -60,7 +56,6 @@ router.get("/", async (req, res) => {
 ========================================= */
 router.get("/:binId", async (req, res) => {
   try {
-
     const bin = await Bin.findOne({ binId: req.params.binId });
 
     if (!bin) {
@@ -70,9 +65,7 @@ router.get("/:binId", async (req, res) => {
     res.json(addOnlineStatus(bin));
 
   } catch (error) {
-
     res.status(500).json({ error: error.message });
-
   }
 });
 
@@ -80,9 +73,7 @@ router.get("/:binId", async (req, res) => {
    GET — BIN STATUS (FOR ESP)
 ========================================= */
 router.get("/:binId/status", async (req, res) => {
-
   try {
-
     const bin = await Bin.findOne({ binId: req.params.binId });
 
     if (!bin) {
@@ -94,20 +85,15 @@ router.get("/:binId/status", async (req, res) => {
     });
 
   } catch (error) {
-
     res.status(500).json({ error: error.message });
-
   }
-
 });
 
 /* =========================================
    POST — CREATE OR UPDATE BIN (ESP DATA)
 ========================================= */
 router.post("/", verifyAPI, async (req, res) => {
-
   try {
-
     const { binId, fillStatus } = req.body;
 
     if (!binId) {
@@ -116,10 +102,7 @@ router.post("/", verifyAPI, async (req, res) => {
 
     let updateData = { ...req.body };
 
-    /* =====================================
-       AUTO LOCK BASED ON SENSOR STATUS
-    ===================================== */
-
+    /* AUTO LOCK */
     if (fillStatus === "FULL") {
       updateData.locked = true;
     }
@@ -137,26 +120,26 @@ router.post("/", verifyAPI, async (req, res) => {
       }
     );
 
+    /* 🔥 REAL-TIME EMIT */
+    const io = req.app.get("io");
+    io.emit("binUpdated", { binId });
+
     res.status(200).json({
       message: "Bin data saved successfully",
       data: updatedBin
     });
 
   } catch (error) {
-
+    console.error("POST ERROR:", error);
     res.status(500).json({ error: error.message });
-
   }
-
 });
 
 /* =========================================
    PATCH — TOGGLE LOCK (ADMIN CONTROL)
 ========================================= */
 router.patch("/:binId/lock", verifyAPI, async (req, res) => {
-
   try {
-
     const bin = await Bin.findOne({ binId: req.params.binId });
 
     if (!bin) {
@@ -167,26 +150,26 @@ router.patch("/:binId/lock", verifyAPI, async (req, res) => {
 
     await bin.save();
 
+    /* 🔥 REAL-TIME EMIT */
+    const io = req.app.get("io");
+    io.emit("binUpdated", { binId: bin.binId });
+
     res.json({
       message: "Lock state updated",
       data: bin
     });
 
   } catch (error) {
-
+    console.error("LOCK ERROR:", error);
     res.status(500).json({ error: error.message });
-
   }
-
 });
 
 /* =========================================
    DEMO MODE - FORCE BIN STATUS
 ========================================= */
 router.patch("/:binId/demo", async (req, res) => {
-
   try {
-
     const { fillStatus, gasStatus } = req.body;
 
     const bin = await Bin.findOne({ binId: req.params.binId });
@@ -196,7 +179,6 @@ router.patch("/:binId/demo", async (req, res) => {
     }
 
     if (fillStatus) {
-
       bin.fillStatus = fillStatus;
 
       if (fillStatus === "FULL") {
@@ -206,7 +188,6 @@ router.patch("/:binId/demo", async (req, res) => {
       if (fillStatus === "ACTIVE") {
         bin.locked = false;
       }
-
     }
 
     if (gasStatus) {
@@ -215,17 +196,19 @@ router.patch("/:binId/demo", async (req, res) => {
 
     await bin.save();
 
+    /* 🔥 REAL-TIME EMIT */
+    const io = req.app.get("io");
+    io.emit("binUpdated", { binId: bin.binId });
+
     res.json({
       message: "Demo update successful",
       data: bin
     });
 
   } catch (error) {
-
+    console.error("DEMO ERROR:", error);
     res.status(500).json({ error: error.message });
-
   }
-
 });
 
 module.exports = router;
