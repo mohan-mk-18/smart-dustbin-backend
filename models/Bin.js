@@ -36,6 +36,11 @@ const binSchema = new mongoose.Schema(
     locked: {
       type: Boolean,
       default: false
+    },
+
+    adminUnlocked: {
+      type: Boolean,
+      default: false
     }
   },
   {
