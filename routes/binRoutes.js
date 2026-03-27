@@ -13,9 +13,7 @@ const ONLINE_THRESHOLD = 10;
 function addOnlineStatus(bin) {
   const now = new Date();
   const last = new Date(bin.updatedAt);
-
   const diff = (now - last) / 1000;
-
   return {
     ...bin._doc,
     isOnline: diff < ONLINE_THRESHOLD
@@ -27,11 +25,9 @@ function addOnlineStatus(bin) {
 ========================================= */
 function verifyAPI(req, res, next) {
   const apiKey = req.headers["x-api-key"];
-
   if (apiKey !== process.env.API_KEY) {
     return res.status(403).json({ error: "Unauthorized" });
   }
-
   next();
 }
 
@@ -41,11 +37,8 @@ function verifyAPI(req, res, next) {
 router.get("/", async (req, res) => {
   try {
     const bins = await Bin.find().sort({ binId: 1 });
-
     const binsWithStatus = bins.map(bin => addOnlineStatus(bin));
-
     res.json(binsWithStatus);
-
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -57,33 +50,27 @@ router.get("/", async (req, res) => {
 router.get("/:binId", async (req, res) => {
   try {
     const bin = await Bin.findOne({ binId: req.params.binId });
-
-    if (!bin) {
-      return res.status(404).json({ error: "Bin not found" });
-    }
-
+    if (!bin) return res.status(404).json({ error: "Bin not found" });
     res.json(addOnlineStatus(bin));
-
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 /* =========================================
-   GET — BIN STATUS (FOR ESP)
+   GET — BIN STATUS (FOR ESP POLLING)
+   ESP calls this every 3 seconds to check
+   if admin has unlocked the bin from the UI
 ========================================= */
 router.get("/:binId/status", async (req, res) => {
   try {
     const bin = await Bin.findOne({ binId: req.params.binId });
-
-    if (!bin) {
-      return res.status(404).json({ error: "Bin not found" });
-    }
+    if (!bin) return res.status(404).json({ error: "Bin not found" });
 
     res.json({
-      locked: bin.locked
+      locked: bin.locked,
+      adminUnlocked: bin.adminUnlocked
     });
-
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -91,6 +78,8 @@ router.get("/:binId/status", async (req, res) => {
 
 /* =========================================
    POST — CREATE OR UPDATE BIN (ESP DATA)
+   KEY FIX: if adminUnlocked is true, skip
+   the auto-lock so sensor doesnt fight admin
 ========================================= */
 router.post("/", verifyAPI, async (req, res) => {
   try {
@@ -100,27 +89,25 @@ router.post("/", verifyAPI, async (req, res) => {
       return res.status(400).json({ error: "binId is required" });
     }
 
+    const existingBin = await Bin.findOne({ binId });
+
     let updateData = { ...req.body };
 
-    /* AUTO LOCK */
-    if (fillStatus === "FULL") {
-      updateData.locked = true;
-    }
-
-    if (fillStatus === "ACTIVE") {
-      updateData.locked = false;
+    if (!existingBin || !existingBin.adminUnlocked) {
+      if (fillStatus === "FULL") {
+        updateData.locked = true;
+      }
+      if (fillStatus === "ACTIVE") {
+        updateData.locked = false;
+      }
     }
 
     const updatedBin = await Bin.findOneAndUpdate(
-      { binId: binId },
+      { binId },
       updateData,
-      {
-        new: true,
-        upsert: true
-      }
+      { new: true, upsert: true }
     );
 
-    /* 🔥 REAL-TIME EMIT */
     const io = req.app.get("io");
     io.emit("binUpdated", { binId });
 
@@ -137,30 +124,61 @@ router.post("/", verifyAPI, async (req, res) => {
 
 /* =========================================
    PATCH — TOGGLE LOCK (ADMIN CONTROL)
+   Sets adminUnlocked=true when admin unlocks
+   so the ESP knows not to re-lock immediately
 ========================================= */
-router.patch("/:binId/lock", verifyAPI, async (req, res) => {
+router.patch("/:binId/lock", async (req, res) => {
   try {
     const bin = await Bin.findOne({ binId: req.params.binId });
-
-    if (!bin) {
-      return res.status(404).json({ error: "Bin not found" });
-    }
+    if (!bin) return res.status(404).json({ error: "Bin not found" });
 
     bin.locked = !bin.locked;
 
+    if (!bin.locked) {
+      bin.adminUnlocked = true;
+    } else {
+      bin.adminUnlocked = false;
+    }
+
     await bin.save();
 
-    /* 🔥 REAL-TIME EMIT */
     const io = req.app.get("io");
     io.emit("binUpdated", { binId: bin.binId });
 
     res.json({
       message: "Lock state updated",
-      data: bin
+      locked: bin.locked,
+      adminUnlocked: bin.adminUnlocked
     });
 
   } catch (error) {
     console.error("LOCK ERROR:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/* =========================================
+   PATCH — RESET ADMIN UNLOCK (ESP CALLS THIS)
+   After the 10s unlock window, ESP calls this
+   to clear the flag so auto-lock resumes
+========================================= */
+router.patch("/:binId/reset-admin-unlock", verifyAPI, async (req, res) => {
+  try {
+    const bin = await Bin.findOne({ binId: req.params.binId });
+    if (!bin) return res.status(404).json({ error: "Bin not found" });
+
+    bin.adminUnlocked = false;
+    bin.locked = true;
+
+    await bin.save();
+
+    const io = req.app.get("io");
+    io.emit("binUpdated", { binId: bin.binId });
+
+    res.json({ message: "Admin unlock reset", locked: bin.locked });
+
+  } catch (error) {
+    console.error("RESET ERROR:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -173,20 +191,17 @@ router.patch("/:binId/demo", async (req, res) => {
     const { fillStatus, gasStatus } = req.body;
 
     const bin = await Bin.findOne({ binId: req.params.binId });
-
-    if (!bin) {
-      return res.status(404).json({ error: "Bin not found" });
-    }
+    if (!bin) return res.status(404).json({ error: "Bin not found" });
 
     if (fillStatus) {
       bin.fillStatus = fillStatus;
-
       if (fillStatus === "FULL") {
         bin.locked = true;
+        bin.adminUnlocked = false;
       }
-
       if (fillStatus === "ACTIVE") {
         bin.locked = false;
+        bin.adminUnlocked = false;
       }
     }
 
@@ -196,14 +211,10 @@ router.patch("/:binId/demo", async (req, res) => {
 
     await bin.save();
 
-    /* 🔥 REAL-TIME EMIT */
     const io = req.app.get("io");
     io.emit("binUpdated", { binId: bin.binId });
 
-    res.json({
-      message: "Demo update successful",
-      data: bin
-    });
+    res.json({ message: "Demo update successful", data: bin });
 
   } catch (error) {
     console.error("DEMO ERROR:", error);
