@@ -59,8 +59,6 @@ router.get("/:binId", async (req, res) => {
 
 /* =========================================
    GET — BIN STATUS (FOR ESP POLLING)
-   ESP calls this every 3 seconds to check
-   if admin has unlocked the bin from the UI
 ========================================= */
 router.get("/:binId/status", async (req, res) => {
   try {
@@ -78,8 +76,14 @@ router.get("/:binId/status", async (req, res) => {
 
 /* =========================================
    POST — CREATE OR UPDATE BIN (ESP DATA)
-   KEY FIX: if adminUnlocked is true, skip
-   the auto-lock so sensor doesnt fight admin
+
+   LOGIC:
+   - FULL + adminUnlocked=true  → skip auto-lock
+     (admin opened it, worker is collecting)
+   - FULL + adminUnlocked=false → auto-lock
+     (normal full bin, no override)
+   - ACTIVE → always unlock AND clear adminUnlocked
+     (bin emptied, worker done, override no longer needed)
 ========================================= */
 router.post("/", verifyAPI, async (req, res) => {
   try {
@@ -93,13 +97,21 @@ router.post("/", verifyAPI, async (req, res) => {
 
     let updateData = { ...req.body };
 
-    if (!existingBin || !existingBin.adminUnlocked) {
-      if (fillStatus === "FULL") {
+    if (fillStatus === "ACTIVE") {
+
+      // Bin has been emptied — always unlock and clear the
+      // admin override so the next FULL cycle works correctly
+      updateData.locked = false;
+      updateData.adminUnlocked = false;
+
+    } else if (fillStatus === "FULL") {
+
+      // Only auto-lock if admin has NOT manually unlocked it
+      if (!existingBin || !existingBin.adminUnlocked) {
         updateData.locked = true;
       }
-      if (fillStatus === "ACTIVE") {
-        updateData.locked = false;
-      }
+      // If adminUnlocked is true, leave locked as-is —
+      // worker is currently collecting, don't interfere
     }
 
     const updatedBin = await Bin.findOneAndUpdate(
@@ -124,8 +136,6 @@ router.post("/", verifyAPI, async (req, res) => {
 
 /* =========================================
    PATCH — TOGGLE LOCK (ADMIN CONTROL)
-   Sets adminUnlocked=true when admin unlocks
-   so the ESP knows not to re-lock immediately
 ========================================= */
 router.patch("/:binId/lock", async (req, res) => {
   try {
@@ -159,8 +169,8 @@ router.patch("/:binId/lock", async (req, res) => {
 
 /* =========================================
    PATCH — RESET ADMIN UNLOCK (ESP CALLS THIS)
-   After the 10s unlock window, ESP calls this
-   to clear the flag so auto-lock resumes
+   After the 10s window expires and bin is
+   still physically full
 ========================================= */
 router.patch("/:binId/reset-admin-unlock", verifyAPI, async (req, res) => {
   try {
@@ -184,7 +194,7 @@ router.patch("/:binId/reset-admin-unlock", verifyAPI, async (req, res) => {
 });
 
 /* =========================================
-   DEMO MODE - FORCE BIN STATUS
+   DEMO MODE
 ========================================= */
 router.patch("/:binId/demo", async (req, res) => {
   try {
